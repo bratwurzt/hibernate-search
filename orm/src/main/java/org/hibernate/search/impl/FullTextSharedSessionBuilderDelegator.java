@@ -8,10 +8,8 @@ package org.hibernate.search.impl;
 
 import java.sql.Connection;
 
-import org.hibernate.ConnectionReleaseMode;
-import org.hibernate.Interceptor;
-import org.hibernate.SessionEventListener;
-import org.hibernate.SharedSessionBuilder;
+import org.hibernate.*;
+import org.hibernate.resource.jdbc.spi.PhysicalConnectionHandlingMode;
 import org.hibernate.resource.jdbc.spi.StatementInspector;
 import org.hibernate.search.FullTextSession;
 import org.hibernate.search.FullTextSharedSessionBuilder;
@@ -46,13 +44,25 @@ class FullTextSharedSessionBuilderDelegator implements FullTextSharedSessionBuil
 		return this;
 	}
 
-	@Override
+  @Override
+  public SharedSessionBuilder connectionHandlingMode()
+  {
+    return null;
+  }
+
+  @Override
 	public FullTextSharedSessionBuilder autoJoinTransactions() {
 		builder.autoJoinTransactions();
 		return this;
 	}
 
-	@Override
+  @Override
+  public SharedSessionBuilder flushMode()
+  {
+    return null;
+  }
+
+  @Override
 	public FullTextSharedSessionBuilder autoClose() {
 		builder.autoClose();
 		return this;
@@ -94,7 +104,13 @@ class FullTextSharedSessionBuilderDelegator implements FullTextSharedSessionBuil
 		return this;
 	}
 
-	@Override
+  @Override
+  public SessionBuilder connectionHandlingMode(PhysicalConnectionHandlingMode mode)
+  {
+    return null;
+  }
+
+  @Override
 	public FullTextSharedSessionBuilder autoJoinTransactions(boolean autoJoinTransactions) {
 		builder.autoJoinTransactions( autoJoinTransactions );
 		return this;
@@ -106,7 +122,19 @@ class FullTextSharedSessionBuilderDelegator implements FullTextSharedSessionBuil
 		return this;
 	}
 
-	@Override
+  @Override
+  public SessionBuilder autoClear(boolean autoClear)
+  {
+    return null;
+  }
+
+  @Override
+  public SessionBuilder flushMode(FlushMode flushMode)
+  {
+    return null;
+  }
+
+  @Override
 	public FullTextSharedSessionBuilder flushBeforeCompletion(boolean flushBeforeCompletion) {
 		builder.flushBeforeCompletion( flushBeforeCompletion );
 		return this;

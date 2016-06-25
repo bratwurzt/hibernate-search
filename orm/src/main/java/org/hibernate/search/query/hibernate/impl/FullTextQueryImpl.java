@@ -6,44 +6,35 @@
  */
 package org.hibernate.search.query.hibernate.impl;
 
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.lucene.search.Explanation;
 import org.apache.lucene.search.Filter;
 import org.apache.lucene.search.Sort;
-import org.hibernate.Criteria;
-import org.hibernate.LockMode;
-import org.hibernate.LockOptions;
-import org.hibernate.Query;
-import org.hibernate.QueryTimeoutException;
-import org.hibernate.ScrollMode;
-import org.hibernate.ScrollableResults;
-import org.hibernate.Session;
-import org.hibernate.engine.query.spi.ParameterMetadata;
+import org.hibernate.*;
 import org.hibernate.engine.spi.SessionImplementor;
-import org.hibernate.internal.AbstractQueryImpl;
+import org.hibernate.query.*;
+import org.hibernate.query.Query;
+import org.hibernate.query.internal.AbstractProducedQuery;
+import org.hibernate.query.spi.QueryImplementor;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.search.FullTextQuery;
 import org.hibernate.search.engine.integration.impl.ExtendedSearchIntegrator;
 import org.hibernate.search.filter.FullTextFilter;
 import org.hibernate.search.hcore.util.impl.ContextHelper;
 import org.hibernate.search.query.DatabaseRetrievalMethod;
 import org.hibernate.search.query.ObjectLookupMethod;
-import org.hibernate.search.query.engine.spi.DocumentExtractor;
-import org.hibernate.search.query.engine.spi.EntityInfo;
-import org.hibernate.search.query.engine.spi.FacetManager;
-import org.hibernate.search.query.engine.spi.HSQuery;
-import org.hibernate.search.query.engine.spi.QueryDescriptor;
-import org.hibernate.search.query.engine.spi.TimeoutExceptionFactory;
-import org.hibernate.search.query.engine.spi.TimeoutManager;
+import org.hibernate.search.query.engine.spi.*;
 import org.hibernate.search.spatial.Coordinates;
 import org.hibernate.search.spatial.impl.Point;
 import org.hibernate.search.util.logging.impl.Log;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
 import org.hibernate.transform.ResultTransformer;
+import org.hibernate.type.Type;
+
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Implementation of {@link org.hibernate.search.FullTextQuery}.
@@ -51,7 +42,7 @@ import org.hibernate.transform.ResultTransformer;
  * @author Emmanuel Bernard
  * @author Hardy Ferentschik
  */
-public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuery {
+public class FullTextQueryImpl extends AbstractProducedQuery implements FullTextQuery {
 
 	private static final Log log = LoggerFactory.make();
 
@@ -69,15 +60,15 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 	 *
 	 * @param query The query.
 	 * @param classes Array of classes (must be immutable) used to filter the results to the given class types.
-	 * @param session Access to the Hibernate session.
+	 * @param producer Access to the Hibernate session.
 	 * @param parameterMetadata Additional query metadata.
 	 */
 	public FullTextQueryImpl(QueryDescriptor query,
 			Class<?>[] classes,
-			SessionImplementor session,
+			SessionImplementor producer,
 			ParameterMetadata parameterMetadata) {
 		//TODO handle flushMode
-		super( query.toString(), null, session, parameterMetadata );
+		super( producer, parameterMetadata );
 
 		ExtendedSearchIntegrator extendedIntegrator = getExtendedSearchIntegrator();
 		this.objectLookupMethod = extendedIntegrator.getDefaultObjectLookupMethod();
@@ -86,7 +77,7 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 		hSearchQuery = query.createHSQuery( extendedIntegrator );
 		hSearchQuery
 				.timeoutExceptionFactory( exceptionFactory )
-				.tenantIdentifier( session.getTenantIdentifier() )
+				.tenantIdentifier( producer.getTenantIdentifier() )
 				.targetedEntities( Arrays.asList( classes ) );
 	}
 
@@ -145,7 +136,7 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 				.criteria( criteria )
 				.targetedEntities( hSearchQuery.getTargetedEntities() )
 				.indexedTargetedEntities( hSearchQuery.getIndexedTargetedEntities() )
-				.session( session )
+				.session((SessionImplementor) getProducer())
 				.searchFactory( hSearchQuery.getExtendedSearchIntegrator() )
 				.timeoutManager( hSearchQuery.getTimeoutManager() )
 				.lookupMethod( objectLookupMethod )
@@ -161,7 +152,7 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 	private Loader getProjectionLoader(ObjectLoaderBuilder loaderBuilder) {
 		ProjectionLoader loader = new ProjectionLoader();
 		loader.init(
-				(Session) session,
+				(Session) getProducer(),
 				hSearchQuery.getExtendedSearchIntegrator(),
 				resultTransformer,
 				loaderBuilder,
@@ -172,8 +163,10 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 		return loader;
 	}
 
+
+
 	@Override
-	public ScrollableResults scroll() {
+	public ScrollableResultsImplementor scroll() {
 		//keep the searcher open until the resultset is closed
 
 		hSearchQuery.getTimeoutManager().start();
@@ -185,13 +178,13 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 				fetchSize,
 				documentExtractor,
 				loader,
-				this.session,
+				(SessionImplementor) getProducer(),
 				hSearchQuery.hasThisProjection()
 		);
 	}
 
 	@Override
-	public ScrollableResults scroll(ScrollMode scrollMode) {
+	public ScrollableResultsImplementor scroll(ScrollMode scrollMode) {
 		//TODO think about this scrollmode
 		return scroll();
 	}
@@ -219,7 +212,13 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 		return hSearchQuery.explain( documentId );
 	}
 
-	@Override
+  @Override
+  public List getResultList()
+  {
+    throw new UnsupportedOperationException( "Have no idea if this is needed" );
+  }
+
+  @Override
 	public int getResultSize() {
 		if ( getLoader().isSizeSafe() ) {
 			return hSearchQuery.queryResultSize();
@@ -227,6 +226,12 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 		else {
 			throw log.cannotGetResultSizeWithCriteriaAndRestriction( criteria.toString() );
 		}
+	}
+
+	@Override
+	public String[] getReturnAliases()
+	{
+		throw new UnsupportedOperationException( "Have no idea if this is needed" );
 	}
 
 	@Override
@@ -260,6 +265,24 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 	}
 
 	@Override
+	public Query setEntity(int position, Object val)
+	{
+		throw new UnsupportedOperationException( "Have no idea if this is needed" );
+	}
+
+	@Override
+	public Query setEntity(String name, Object val)
+	{
+		throw new UnsupportedOperationException( "Have no idea if this is needed" );
+	}
+
+	@Override
+	protected boolean isNativeQuery()
+	{
+		return false;
+	}
+
+	@Override
 	public FullTextQuery setMaxResults(int maxResults) {
 		hSearchQuery.maxResults( maxResults );
 		return this;
@@ -276,7 +299,19 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 	}
 
 	@Override
-	public Query setLockOptions(LockOptions lockOptions) {
+	public Type[] getReturnTypes()
+	{
+		throw new UnsupportedOperationException( "Have no idea if this is needed" );
+	}
+
+  @Override
+  public Object getSingleResult()
+  {
+    throw new UnsupportedOperationException( "Have no idea if this is needed" );
+  }
+
+  @Override
+	public QueryImplementor setLockOptions(LockOptions lockOptions) {
 		throw new UnsupportedOperationException( "Lock options are not implemented in Hibernate Search queries" );
 	}
 
@@ -288,10 +323,10 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 	}
 
 	@Override
-	@SuppressWarnings("unchecked")
-	public <T> T unwrap(Class<T> type) {
+	public Object unwrap(Class type)
+	{
 		if ( type == org.apache.lucene.search.Query.class ) {
-			return (T) hSearchQuery.getLuceneQuery();
+			return hSearchQuery.getLuceneQuery();
 		}
 		throw new IllegalArgumentException( "Cannot unwrap " + type.getName() );
 	}
@@ -307,7 +342,7 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 	}
 
 	@Override
-	public Query setLockMode(String alias, LockMode lockMode) {
+	public QueryImplementor setLockMode(String alias, LockMode lockMode) {
 		throw new UnsupportedOperationException( "Lock options are not implemented in Hibernate Search queries" );
 	}
 
@@ -328,6 +363,12 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 	@Override
 	public FacetManager getFacetManager() {
 		return hSearchQuery.getFacetManager();
+	}
+
+	@Override
+	public String getQueryString()
+	{
+		throw new UnsupportedOperationException( "Have no idea if this is needed" );
 	}
 
 	@Override
@@ -363,7 +404,7 @@ public class FullTextQueryImpl extends AbstractQueryImpl implements FullTextQuer
 	}
 
 	private ExtendedSearchIntegrator getExtendedSearchIntegrator() {
-		return ContextHelper.getSearchIntegratorBySessionImplementor( session );
+		return ContextHelper.getSearchIntegratorBySessionImplementor((SessionImplementor) getProducer());
 	}
 
 	private static final Loader noLoader = new Loader() {

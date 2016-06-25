@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.search.util.logging.impl.Log;
 
 import org.hibernate.ScrollableResults;
@@ -53,8 +54,8 @@ import org.hibernate.type.Type;
  * @author John Griffin
  * @author Sanne Grinovero
  */
-public class ScrollableResultsImpl implements ScrollableResults {
-
+public class ScrollableResultsImpl implements ScrollableResultsImplementor
+{
 	private static final Log log = LoggerFactory.make();
 
 	private final int first;
@@ -64,6 +65,7 @@ public class ScrollableResultsImpl implements ScrollableResults {
 	private final DocumentExtractor documentExtractor;
 	private final SessionImplementor session;
 	private final boolean hasThisProjection;
+	private boolean closed;
 
 	/**
 	 * Caches result rows and EntityInfo from
@@ -210,12 +212,19 @@ public class ScrollableResultsImpl implements ScrollableResults {
 
 	@Override
 	public void close() {
+		if ( this.closed ) {
+			// noop if already closed
+			return;
+		}
+
 		try {
 			documentExtractor.close();
 		}
 		catch (SearchException e) {
 			log.unableToCloseSearcherInScrollableResult( e );
 		}
+
+		this.closed = true;
 	}
 
 	@Override
@@ -226,7 +235,7 @@ public class ScrollableResultsImpl implements ScrollableResults {
 		// (or 0 I can't remember) but we can't
 		// do that since we have to make up for
 		// an Object[]. J.G
-		if ( current < first || current > max ) {
+		if ( closed || current < first || current > max ) {
 			return null;
 		}
 		LoadedObject cacheEntry = ensureCurrentLoaded();
@@ -439,6 +448,12 @@ public class ScrollableResultsImpl implements ScrollableResults {
 			current = max + rowNumber + 1; //max row start at -1
 		}
 		return current >= first && current <= max;
+	}
+
+	@Override
+	public boolean isClosed()
+	{
+		return this.closed;
 	}
 
 	private final class LoadedObject {

@@ -16,6 +16,7 @@ import org.hibernate.action.spi.AfterTransactionCompletionProcess;
 import org.hibernate.action.spi.BeforeTransactionCompletionProcess;
 import org.hibernate.engine.spi.ActionQueue;
 import org.hibernate.engine.spi.SessionImplementor;
+import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.event.service.spi.EventListenerRegistry;
 import org.hibernate.event.spi.EventSource;
 import org.hibernate.event.spi.EventType;
@@ -181,16 +182,17 @@ public class EventSourceTransactionContext implements TransactionContext, Serial
 			this.synchronization = synchronization;
 		}
 
-		@Override
-		public void doAfterTransactionCompletion(boolean success, SessionImplementor sessionImplementor) {
-			try {
-				synchronization.afterCompletion( success ? Status.STATUS_COMMITTED : Status.STATUS_ROLLEDBACK );
-			}
-			catch (Exception e) {
-				throw new HibernateException( "Error while indexing in Hibernate Search (after transaction completion)", e);
-			}
-		}
-	}
+    @Override
+    public void doAfterTransactionCompletion(boolean success, SharedSessionContractImplementor session)
+    {
+      try {
+        synchronization.afterCompletion( success ? Status.STATUS_COMMITTED : Status.STATUS_ROLLEDBACK );
+      }
+      catch (Exception e) {
+        throw new HibernateException( "Error while indexing in Hibernate Search (after transaction completion)", e);
+      }
+    }
+  }
 
 	private static class BeforeCommitSynchronizationDelegator implements Synchronization {
 		private final Synchronization synchronization;
