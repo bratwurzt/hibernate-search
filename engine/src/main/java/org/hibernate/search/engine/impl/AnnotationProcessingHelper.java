@@ -135,11 +135,11 @@ public final class AnnotationProcessingHelper {
 			boolean isRemote) {
 		Class<?> analyzerClass = analyzerAnn == null ? void.class : analyzerAnn.impl();
 		if ( isRemote ) {
-			return remoteAnalyzerReferenceFromDefinition( analyzerAnn, configContext );
+			return remoteAnalyzerReferenceFromDefinition( analyzerAnn == null ? "" : analyzerAnn.definition(), configContext );
 		}
 		else {
 			if ( analyzerClass == void.class ) {
-				return luceneAnalyzerReferenceFromDefinition( analyzerAnn, configContext );
+				return luceneAnalyzerReferenceFromDefinition( analyzerAnn == null ? "" : analyzerAnn.definition(), configContext );
 			}
 			else {
 				return luceneAnalyzerReferenceFromClass( configContext, analyzerClass );
@@ -147,18 +147,30 @@ public final class AnnotationProcessingHelper {
 		}
 	}
 
-	private static AnalyzerReference remoteAnalyzerReferenceFromDefinition(org.hibernate.search.annotations.Analyzer analyzerAnn,
-			ConfigContext configContext) {
-		String definition = analyzerAnn == null ? "" : analyzerAnn.definition();
+	public static AnalyzerReference getAnalyzerReference(org.hibernate.search.annotations.SearchAnalyzer analyzerAnn, ConfigContext configContext,
+			boolean isRemote) {
+		Class<?> analyzerClass = analyzerAnn == null ? void.class : analyzerAnn.impl();
+		if ( isRemote ) {
+			return remoteAnalyzerReferenceFromDefinition( analyzerAnn == null ? "" : analyzerAnn.definition(), configContext );
+		}
+		else {
+			if ( analyzerClass == void.class ) {
+				return luceneAnalyzerReferenceFromDefinition( analyzerAnn == null ? "" : analyzerAnn.definition(), configContext );
+			}
+			else {
+				return luceneAnalyzerReferenceFromClass( configContext, analyzerClass );
+			}
+		}
+	}
+
+	private static AnalyzerReference remoteAnalyzerReferenceFromDefinition(String definition, ConfigContext configContext) {
 		if ( StringHelper.isEmpty( definition ) ) {
 			return null;
 		}
 		return configContext.buildRemoteAnalyzerReference( definition );
 	}
 
-	private static AnalyzerReference luceneAnalyzerReferenceFromDefinition(org.hibernate.search.annotations.Analyzer analyzerAnn,
-			ConfigContext configContext) {
-		String definition = analyzerAnn == null ? "" : analyzerAnn.definition();
+	private static AnalyzerReference luceneAnalyzerReferenceFromDefinition(String definition, ConfigContext configContext) {
 		if ( StringHelper.isEmpty( definition ) ) {
 			return null;
 		}

@@ -100,6 +100,20 @@ public class ClassBridgeMapping {
 		return this;
 	}
 
+	public ClassBridgeMapping searchAnalyzer(Class<?> analyzerClass) {
+		final Map<String, Object> analyzer = new HashMap<String, Object>();
+		analyzer.put( "impl", analyzerClass );
+		classBridge.put( "searchAnalyzer", analyzer );
+		return this;
+	}
+
+	public ClassBridgeMapping searchAnalyzer(String analyzerDef) {
+		final Map<String, Object> analyzer = new HashMap<String, Object>();
+		analyzer.put( "definition", analyzerDef );
+		classBridge.put( "searchAnalyzer", analyzer );
+		return this;
+	}
+
 	public ClassBridgeMapping param(String name, String value) {
 		Map<String, Object> param = SearchMapping.addElementToAnnotationArray( classBridge, "params" );
 		param.put( "name", name );

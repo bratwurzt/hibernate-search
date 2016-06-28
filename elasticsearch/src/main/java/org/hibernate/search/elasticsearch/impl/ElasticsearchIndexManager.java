@@ -341,6 +341,15 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 		return null;
 	}
 
+	private String searchAnalyzerName(Class<?> entityType, DocumentFieldMetadata fieldMetadata) {
+		AnalyzerReference searchAnalyzerReference = fieldMetadata.getSearchAnalyzerReference();
+		if ( searchAnalyzerReference.is( RemoteAnalyzerReference.class ) ) {
+			return searchAnalyzerReference.unwrap( RemoteAnalyzerReference.class ).getAnalyzer().getName( fieldMetadata.getFieldName() );
+		}
+		LOG.analyzerIsNotRemote( entityType, fieldMetadata.getFieldName(), searchAnalyzerReference );
+		return null;
+	}
+
 	/**
 	 * Adds a type mapping for the given field to the given request payload.
 	 */
@@ -363,6 +372,11 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 		String analyzerName = getAnalyzerName( descriptor, fieldMetadata, index );
 		if ( analyzerName != null ) {
 			field.addProperty( "analyzer", analyzerName );
+		}
+
+		String searchAnalyzerName = getSearchAnalyzerName( descriptor, fieldMetadata, index );
+		if ( searchAnalyzerName != null ) {
+			field.addProperty( "search_analyzer", searchAnalyzerName );
 		}
 
 		if ( fieldMetadata.getBoost() != null ) {
@@ -388,6 +402,13 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 	private String getAnalyzerName(EntityIndexBinding descriptor, DocumentFieldMetadata fieldMetadata, String index) {
 		if ( isAnalyzed( index ) && fieldMetadata.getAnalyzerReference() != null ) {
 			return analyzerName( descriptor.getDocumentBuilder().getBeanClass(), fieldMetadata );
+		}
+		return null;
+	}
+
+	private String getSearchAnalyzerName(EntityIndexBinding descriptor, DocumentFieldMetadata fieldMetadata, String index) {
+		if ( isAnalyzed( index ) && fieldMetadata.getSearchAnalyzerReference() != null ) {
+			return searchAnalyzerName( descriptor.getDocumentBuilder().getBeanClass(), fieldMetadata );
 		}
 		return null;
 	}

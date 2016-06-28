@@ -34,6 +34,7 @@ public class DocumentFieldMetadata {
 	private final FieldBridge fieldBridge;
 	private final Float boost;
 	private final AnalyzerReference analyzerReference;
+	private final AnalyzerReference searchAnalyzerReference;
 	private final boolean isId;
 	private final boolean isIdInEmbedded;
 	private final NullMarkerCodec nullMarkerCodec;
@@ -51,6 +52,7 @@ public class DocumentFieldMetadata {
 		this.fieldBridge = builder.fieldBridge;
 		this.boost = builder.boost;
 		this.analyzerReference = builder.analyzerReference;
+		this.searchAnalyzerReference = builder.searchAnalyzerReference;
 		this.isId = builder.isId;
 		this.isIdInEmbedded = builder.isIdInEmbedded;
 		this.nullMarkerCodec = builder.nullMarkerCodec;
@@ -97,7 +99,12 @@ public class DocumentFieldMetadata {
 		return analyzerReference;
 	}
 
-	public String indexNullAs() {
+  public AnalyzerReference getSearchAnalyzerReference()
+  {
+    return searchAnalyzerReference;
+  }
+
+  public String indexNullAs() {
 		return nullMarkerCodec.nullRepresentedAsString();
 	}
 
@@ -139,6 +146,7 @@ public class DocumentFieldMetadata {
 				", fieldBridge=" + fieldBridge +
 				", boost=" + boost +
 				", analyzer=" + analyzerReference +
+				", searchAnalyzer=" + searchAnalyzerReference +
 				", isId=" + isId +
 				", isIdInEmbedded=" + isIdInEmbedded +
 				", nullToken='" + nullMarkerCodec.nullRepresentedAsString() + '\'' +
@@ -161,6 +169,7 @@ public class DocumentFieldMetadata {
 		private FieldBridge fieldBridge;
 		private Float boost;
 		private AnalyzerReference analyzerReference;
+		private AnalyzerReference searchAnalyzerReference;
 		private boolean isId;
 		private boolean isIdInEmbedded;
 		private boolean isNumeric;
@@ -194,6 +203,11 @@ public class DocumentFieldMetadata {
 
 		public Builder analyzerReference(AnalyzerReference analyzerReference) {
 			this.analyzerReference = analyzerReference;
+			return this;
+		}
+
+		public Builder searchAnalyzerReference(AnalyzerReference searchAnalyzerReference) {
+			this.searchAnalyzerReference = searchAnalyzerReference;
 			return this;
 		}
 

@@ -89,6 +89,20 @@ public class FieldMapping {
 		return this;
 	}
 
+	public FieldMapping searchAnalyzer(Class<?> analyzerClass) {
+		final Map<String, Object> analyzer = new HashMap<String, Object>();
+		analyzer.put( "impl", analyzerClass );
+		field.put( "searchAnalyzer", analyzer );
+		return this;
+	}
+
+	public FieldMapping searchAnalyzer(String analyzerDef) {
+		final Map<String, Object> analyzer = new HashMap<String, Object>();
+		analyzer.put( "definition", analyzerDef );
+		field.put( "searchAnalyzer", analyzer );
+		return this;
+	}
+
 	public FieldMapping indexNullAs(String indexNullAs) {
 		field.put( "indexNullAs", indexNullAs );
 		return this;

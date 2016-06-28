@@ -7,8 +7,6 @@
 
 package org.hibernate.search.engine.metadata.impl;
 
-import static org.hibernate.search.engine.impl.AnnotationProcessingHelper.getFieldName;
-
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -94,6 +92,8 @@ import org.hibernate.search.util.impl.ClassLoaderHelper;
 import org.hibernate.search.util.impl.ReflectionHelper;
 import org.hibernate.search.util.logging.impl.Log;
 import org.hibernate.search.util.logging.impl.LoggerFactory;
+
+import static org.hibernate.search.engine.impl.AnnotationProcessingHelper.getFieldName;
 
 /**
  * A metadata provider which extracts the required information from annotations.
@@ -701,11 +701,19 @@ public class AnnotationMetadataProvider implements MetadataProvider {
 			typeMetadataBuilder.addToScopedAnalyzerReference( fieldName, analyzer, index );
 		}
 
-		DocumentFieldMetadata fieldMetadata = new DocumentFieldMetadata.Builder( fieldName, store, index, termVector )
-				.boost( classBridgeAnnotation.boost().value() )
-				.fieldBridge( fieldBridge )
-				.analyzerReference(analyzer)
-				.build();
+    final DocumentFieldMetadata.Builder builder = new DocumentFieldMetadata.Builder(fieldName, store, index, termVector)
+        .boost(classBridgeAnnotation.boost().value())
+        .fieldBridge(fieldBridge)
+        .analyzerReference(analyzer);
+
+    if (classBridgeAnnotation.searchAnalyzer() != null)
+    {
+      builder.searchAnalyzerReference(AnnotationProcessingHelper.getAnalyzerReference(
+          classBridgeAnnotation.searchAnalyzer(),
+          configContext,
+          parseContext.isAnalyzerRemote()));
+    }
+    DocumentFieldMetadata fieldMetadata = builder.build();
 
 		typeMetadataBuilder.addClassBridgeField( fieldMetadata );
 

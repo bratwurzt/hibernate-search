@@ -65,6 +65,12 @@ public @interface ClassBridge {
 	 */
 	Analyzer analyzer() default @Analyzer;
 
+  /**
+ 	 * @return Returns a analyzer annotation defining the analyzer to be used. Defaults to
+ 	 *         the inherited analyzer
+ 	 */
+  SearchAnalyzer searchAnalyzer() default @SearchAnalyzer;
+
 	/**
 	 * @return Returns a {@code Boost} annotation defining a float index time boost value
 	 */

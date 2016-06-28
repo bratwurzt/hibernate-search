@@ -50,6 +50,7 @@ import org.hibernate.search.annotations.NumericField;
 import org.hibernate.search.annotations.NumericFields;
 import org.hibernate.search.annotations.Parameter;
 import org.hibernate.search.annotations.ProvidedId;
+import org.hibernate.search.annotations.SearchAnalyzer;
 import org.hibernate.search.annotations.SortableField;
 import org.hibernate.search.annotations.SortableFields;
 import org.hibernate.search.annotations.Spatial;
@@ -450,6 +451,9 @@ public class MappingModelMetadataProvider implements MetadataProvider {
 					if ( "analyzer".equals( entry.getKey() ) ) {
 						addAnalyzerAnnotationTo( fieldAnnotation, entry );
 					}
+          else if ( "searchAnalyzer".equals( entry.getKey() ) ) {
+            addSearchAnalyzerAnnotationTo( fieldAnnotation, entry );
+          }
 					else if ( "boost".equals( entry.getKey() ) ) {
 						AnnotationDescriptor boostAnnotation = new AnnotationDescriptor( Boost.class );
 						@SuppressWarnings("unchecked")
@@ -549,6 +553,16 @@ public class MappingModelMetadataProvider implements MetadataProvider {
 				analyzerAnnotation.setValue( analyzerEntry.getKey(), analyzerEntry.getValue() );
 			}
 			fieldAnnotation.setValue( "analyzer", createAnnotation( analyzerAnnotation ) );
+		}
+
+		private void addSearchAnalyzerAnnotationTo(AnnotationDescriptor fieldAnnotation, Entry<String, Object> entry) {
+			AnnotationDescriptor analyzerAnnotation = new AnnotationDescriptor( SearchAnalyzer.class );
+			@SuppressWarnings("unchecked")
+			Map<String, Object> analyzer = (Map<String, Object>) entry.getValue();
+			for ( Map.Entry<String, Object> analyzerEntry : analyzer.entrySet() ) {
+				analyzerAnnotation.setValue( analyzerEntry.getKey(), analyzerEntry.getValue() );
+			}
+			fieldAnnotation.setValue( "searchAnalyzer", createAnnotation( analyzerAnnotation ) );
 		}
 
 		private void createFieldBridge(PropertyDescriptor property) {
@@ -711,6 +725,9 @@ public class MappingModelMetadataProvider implements MetadataProvider {
 			for ( Entry<String, Object> entry : entrySet ) {
 				if ( "analyzer".equals( entry.getKey() ) ) {
 					addAnalyzerAnnotationTo( annotation, entry );
+				}
+				else if ( "searchAnalyzer".equals( entry.getKey() ) ) {
+          addSearchAnalyzerAnnotationTo( annotation, entry );
 				}
 				else if ( "params".equals( entry.getKey() ) ) {
 					addParamsToAnnotation( annotation, entry );
