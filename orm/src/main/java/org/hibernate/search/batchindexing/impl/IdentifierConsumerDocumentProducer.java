@@ -110,6 +110,27 @@ public class IdentifierConsumerDocumentProducer implements Runnable {
 				.withOptions()
 				.tenantIdentifier( tenantId )
 				.openSession();
+
+    final String fetchProfiles = (String)sessionFactory.getProperties().get("hibernate.search.fetch_profiles");
+    if (fetchProfiles != null && !fetchProfiles.isEmpty())
+    {
+      try
+      {
+        for (String pair : fetchProfiles.split(";"))
+        {
+          final String[] split = pair.split("=");
+          if (type.getName().equals(split[0]))
+          {
+            session.enableFetchProfile(split[1]);
+            break;
+          }
+        }
+      }
+      catch (Exception ignored)
+      {
+      }
+    }
+
 		session.setFlushMode( FlushMode.MANUAL );
 		session.setCacheMode( cacheMode );
 		session.setDefaultReadOnly( true );
