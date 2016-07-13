@@ -353,6 +353,23 @@ public class SearchIntegratorBuilder {
 					documentBuildersContainedEntities.put( mappedClass, documentBuilder );
 				}
 			}
+      else {
+        final XClass parentSearchMetadataXClass = metadataProvider.getParentSearchMetadataXClass(mappedClass, classMappings.keySet());
+        if (parentSearchMetadataXClass != null) {
+          TypeMetadata typeMetadata = metadataProvider.getTypeMetadataForContainedIn(parentSearchMetadataXClass);
+          final DocumentBuilderContainedEntity documentBuilder = new DocumentBuilderContainedEntity(
+              parentSearchMetadataXClass,
+              typeMetadata,
+              searchConfiguration.getReflectionManager(),
+              optimizationBlackListedTypes,
+              searchConfiguration.getInstanceInitializer()
+          );
+          //TODO enhance that, I don't like to expose EntityState
+          if (documentBuilder.getEntityState() != EntityState.NON_INDEXABLE) {
+            documentBuildersContainedEntities.put(mappedClass, documentBuilder);
+          }
+        }
+      }
 		}
 
 		IndexManagerHolder indexesFactory = factoryState.getAllIndexesManager();

@@ -18,12 +18,13 @@ public class ContainedInMapping {
 	private final SearchMapping mapping;
 	private final PropertyDescriptor property;
 	private final EntityDescriptor entity;
+  private final Map<String, Object> containedIn;
 
 	public ContainedInMapping(SearchMapping mapping,PropertyDescriptor property, EntityDescriptor entity) {
 		this.mapping = mapping;
 		this.property = property;
 		this.entity = entity;
-		Map<String, Object> containedIn = new HashMap<String, Object>();
+    containedIn = new HashMap<String, Object>();
 		property.setContainedIn( containedIn );
 	}
 
@@ -54,5 +55,10 @@ public class ContainedInMapping {
 	public PropertyMapping bridge(Class<? extends FieldBridge> fieldBridge) {
 		return new FieldBridgeDirectMapping( property, entity, mapping, fieldBridge );
 	}
+
+  public ContainedInMapping targetElement(Class<?> targetElement) {
+ 		this.containedIn.put( "targetElement", targetElement );
+ 		return this;
+ 	}
 
 }

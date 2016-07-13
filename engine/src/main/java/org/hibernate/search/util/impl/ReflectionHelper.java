@@ -143,6 +143,21 @@ public abstract class ReflectionHelper {
 	}
 
 	/**
+	 * Checks whether the specified class contains any fuileds or methods
+	 *
+	 * @param mappedClass the {@code XClass} to check for Search annotations
+	 *
+	 * @return Returns {@code true} if the class contains at least one Search annotation, {@code false} otherwise
+	 */
+	public static boolean containsDeclaredProperties(XClass mappedClass) {
+    if ( !mappedClass.getDeclaredProperties( XClass.ACCESS_PROPERTY ).isEmpty() ) {
+      return true;
+    }
+
+    return !mappedClass.getDeclaredProperties(XClass.ACCESS_FIELD).isEmpty();
+  }
+
+	/**
 	 * Checks if the annotation is a Search annotation by comparing the package of the annotation.
 	 *
 	 * @param annotation the annotation to check

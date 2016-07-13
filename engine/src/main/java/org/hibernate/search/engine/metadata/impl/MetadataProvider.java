@@ -6,6 +6,9 @@
  */
 package org.hibernate.search.engine.metadata.impl;
 
+import java.util.Set;
+
+import org.hibernate.annotations.common.reflection.XClass;
 import org.hibernate.search.indexes.spi.IndexManagerType;
 
 /**
@@ -38,5 +41,9 @@ public interface MetadataProvider {
 	 */
 	TypeMetadata getTypeMetadataForContainedIn(Class<?> clazz);
 
+  TypeMetadata getTypeMetadataForContainedIn(XClass clazz);
+
 	boolean containsSearchMetadata(Class<?> clazz);
+
+  XClass getParentSearchMetadataXClass(Class<?> clazz, final Set<XClass> xClasses);
 }

@@ -153,7 +153,18 @@ public class AnnotationMetadataProvider implements MetadataProvider {
 		return doGetTypeMetadataFor( clazz, xClass, parseContext );
 	}
 
-	@Override
+  @Override
+  public TypeMetadata getTypeMetadataForContainedIn(final XClass xClass)
+  {
+    final Class clazz = reflectionManager.toClass(xClass);
+    ParseContext parseContext = new ParseContext();
+    parseContext.processingClass( xClass );
+    parseContext.setCurrentClass( xClass );
+
+    return doGetTypeMetadataFor( clazz, xClass, parseContext );
+  }
+
+  @Override
 	public TypeMetadata getTypeMetadataFor(Class<?> clazz, IndexManagerType indexManagerType) {
 		XClass xClass = reflectionManager.toXClass( clazz );
 
@@ -203,6 +214,22 @@ public class AnnotationMetadataProvider implements MetadataProvider {
 		XClass xClass = reflectionManager.toXClass( clazz );
 		return ReflectionHelper.containsSearchAnnotations( xClass );
 	}
+
+  @Override
+  public XClass getParentSearchMetadataXClass(final Class<?> clazz, final Set<XClass> xClasses)
+  {
+    XClass xChildClass = reflectionManager.toXClass( clazz );
+    for ( XClass xClass : xClasses )
+    {
+      if (xClass.isAssignableFrom( xChildClass )
+          && !ReflectionHelper.containsDeclaredProperties( xChildClass )
+          && ReflectionHelper.containsSearchAnnotations( xClass ))
+      {
+        return xClass;
+      }
+    }
+    return null;
+  }
 
 	private void checkDocumentId(XProperty member,
 			TypeMetadata.Builder typeMetadataBuilder,
@@ -997,21 +1024,26 @@ public class AnnotationMetadataProvider implements MetadataProvider {
 			return;
 		}
 
-		ContainedInMetadata containedInMetadata = createContainedInMetadata( member );
+    ContainedIn containedInAnnotation = member.getAnnotation(ContainedIn.class);
+    ContainedInMetadata containedInMetadata = createContainedInMetadata( member ,containedInAnnotation );
 		typeMetadataBuilder.addContainedIn( containedInMetadata );
 
 		parseContext.collectUnqualifiedCollectionRole( member.getName() );
 	}
 
-	private ContainedInMetadata createContainedInMetadata(XProperty member) {
+	private ContainedInMetadata createContainedInMetadata(XProperty member, final ContainedIn containedInAnnotation) {
 		ContainedInMetadataBuilder containedInMetadataBuilder = new ContainedInMetadataBuilder( member );
-		updateContainedInMetadata( containedInMetadataBuilder, member, XClass.ACCESS_FIELD );
-		updateContainedInMetadata( containedInMetadataBuilder, member, XClass.ACCESS_PROPERTY );
+		updateContainedInMetadata( containedInMetadataBuilder, member, containedInAnnotation, XClass.ACCESS_FIELD );
+		updateContainedInMetadata( containedInMetadataBuilder, member, containedInAnnotation, XClass.ACCESS_PROPERTY );
 		return containedInMetadataBuilder.createContainedInMetadata();
 	}
 
-	private void updateContainedInMetadata(ContainedInMetadataBuilder containedInMetadataBuilder, XProperty propertyWithContainedIn, String accessType) {
-		XClass memberReturnedType = returnedType( propertyWithContainedIn );
+	private void updateContainedInMetadata(
+      ContainedInMetadataBuilder containedInMetadataBuilder,
+      XProperty propertyWithContainedIn,
+      final ContainedIn containedInAnnotation,
+      String accessType) {
+		XClass memberReturnedType = elementContainedInClass(propertyWithContainedIn, containedInAnnotation);
 		String mappedBy = mappedBy( propertyWithContainedIn );
 		List<XProperty> returnedTypeProperties = memberReturnedType.getDeclaredProperties( accessType );
 		for ( XProperty property : returnedTypeProperties ) {
@@ -1701,7 +1733,7 @@ public class AnnotationMetadataProvider implements MetadataProvider {
 		}
 		parseContext.incrementLevel();
 
-		XClass elementClass = elementCollection ? returnedType( member ) : elementClass( member, indexedEmbeddedAnnotation );
+		XClass elementClass = elementCollection ? returnedType( member ) : elementEmbeddedClass(member, indexedEmbeddedAnnotation );
 		String localPrefix = elementCollection ? defaultPrefix( member ) : buildEmbeddedPrefix( prefix, indexedEmbeddedAnnotation, member );
 		boolean includeEmbeddedObjectId = elementCollection ? false : indexedEmbeddedAnnotation.includeEmbeddedObjectId();
 
@@ -1829,12 +1861,21 @@ public class AnnotationMetadataProvider implements MetadataProvider {
 		return potentialLevel;
 	}
 
-	private XClass elementClass(XProperty member, IndexedEmbedded indexedEmbeddedAnnotation) {
+	private XClass elementEmbeddedClass(XProperty member, IndexedEmbedded indexedEmbeddedAnnotation) {
 		if ( void.class == indexedEmbeddedAnnotation.targetElement() ) {
 			return returnedType( member );
 		}
 		else {
 			return reflectionManager.toXClass( indexedEmbeddedAnnotation.targetElement() );
+		}
+	}
+
+	private XClass elementContainedInClass(XProperty member, ContainedIn containedInAnnotation) {
+		if ( void.class == containedInAnnotation.targetElement() ) {
+			return returnedType( member );
+		}
+		else {
+			return reflectionManager.toXClass( containedInAnnotation.targetElement() );
 		}
 	}
 

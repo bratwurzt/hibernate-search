@@ -48,4 +48,11 @@ import java.lang.annotation.Documented;
 @Target({ ElementType.FIELD, ElementType.METHOD })
 @Documented
 public @interface ContainedIn {
+
+  /**
+ 	 * Overrides the target type of an association, in case a collection overrides the type of the collection generics.
+ 	 * @return the target type of the association. Default to {@code void.class}
+ 	 */
+ 	Class<?> targetElement() default void.class;
+
 }
