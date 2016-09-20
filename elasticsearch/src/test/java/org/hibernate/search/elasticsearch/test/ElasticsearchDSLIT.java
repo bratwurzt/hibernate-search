@@ -8,6 +8,11 @@ package org.hibernate.search.elasticsearch.test;
 
 import static org.hibernate.search.elasticsearch.testutil.JsonHelper.assertJsonEquals;
 
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
+
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
@@ -18,8 +23,10 @@ import org.hibernate.search.FullTextQuery;
 import org.hibernate.search.FullTextSession;
 import org.hibernate.search.Search;
 import org.hibernate.search.annotations.Analyzer;
+import org.hibernate.search.annotations.DateBridge;
 import org.hibernate.search.annotations.Field;
 import org.hibernate.search.annotations.Indexed;
+import org.hibernate.search.annotations.Resolution;
 import org.hibernate.search.query.dsl.QueryBuilder;
 import org.hibernate.search.test.SearchTestBase;
 import org.junit.Test;
@@ -62,7 +69,7 @@ public class ElasticsearchDSLIT extends SearchTestBase {
 
 			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
 			String queryString = fullTextQuery.getQueryString();
-			assertJsonEquals( "{'query':{'match_phrase':{'message':{'query':'A very important matter','analyzer':'english','slop':2,'boost':1.0}}}}", queryString );
+			assertJsonEquals( "{'query':{'match_phrase':{'message':{'query':'A very important matter','slop':2,'analyzer':'english'}}}}", queryString );
 		}
 	}
 
@@ -81,7 +88,7 @@ public class ElasticsearchDSLIT extends SearchTestBase {
 
 			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
 			String queryString = fullTextQuery.getQueryString();
-			assertJsonEquals( "{'query':{'term':{'message':{'value':'A very important matter','boost':1.0}}}}", queryString );
+			assertJsonEquals( "{'query':{'term':{'message':{'value':'A very important matter'}}}}", queryString );
 		}
 	}
 
@@ -99,7 +106,126 @@ public class ElasticsearchDSLIT extends SearchTestBase {
 
 			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
 			String queryString = fullTextQuery.getQueryString();
-			assertJsonEquals( "{'query':{'match':{'message':{'query':'A very important matter','analyzer':'english','fuzziness':0,'boost':1.0}}}}", queryString );
+			assertJsonEquals( "{'query':{'match':{'message':{'query':'A very important matter','analyzer':'english'}}}}", queryString );
+		}
+	}
+
+	@Test
+	public void testDSLKeywordWithFuzziness() throws Exception {
+		try ( Session session = openSession() ) {
+			FullTextSession fullTextSession = Search.getFullTextSession( session );
+			final QueryBuilder queryBuilder = queryBuilder( fullTextSession );
+
+			Query query = queryBuilder
+					.keyword()
+						.fuzzy()
+							.withEditDistanceUpTo( 2 )
+						.onField( "message" )
+						.matching( "A very important matter" )
+					.createQuery();
+
+			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
+			String queryString = fullTextQuery.getQueryString();
+			assertJsonEquals( "{'query':{'match':{'message':{'query':'A very important matter','analyzer':'english','fuzziness':2}}}}", queryString );
+		}
+	}
+
+	@Test
+	public void testDSLKeywordWithBoost() throws Exception {
+		try ( Session session = openSession() ) {
+			FullTextSession fullTextSession = Search.getFullTextSession( session );
+			final QueryBuilder queryBuilder = queryBuilder( fullTextSession );
+
+			Query query = queryBuilder
+					.keyword()
+						.onField( "message" )
+						.boostedTo( 2.0f )
+						.matching( "A very important matter" )
+					.createQuery();
+
+			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
+			String queryString = fullTextQuery.getQueryString();
+			assertJsonEquals( "{'query':{'match':{'message':{'query':'A very important matter','analyzer':'english','boost':2.0}}}}", queryString );
+		}
+	}
+
+	@Test
+	public void testDSLKeywordBoolean() throws Exception {
+		try ( Session session = openSession() ) {
+			FullTextSession fullTextSession = Search.getFullTextSession( session );
+			final QueryBuilder queryBuilder = queryBuilder( fullTextSession );
+
+			Query query = queryBuilder
+					.keyword()
+						.onField( "personal" )
+						.matching( true )
+					.createQuery();
+
+			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
+			String queryString = fullTextQuery.getQueryString();
+			assertJsonEquals( "{'query':{'term':{'personal':{'value':'true'}}}}", queryString );
+		}
+	}
+
+	@Test
+	public void testDSLKeywordFloat() throws Exception {
+		try ( Session session = openSession() ) {
+			FullTextSession fullTextSession = Search.getFullTextSession( session );
+			final QueryBuilder queryBuilder = queryBuilder( fullTextSession );
+
+			Query query = queryBuilder
+					.keyword()
+						.onField( "shippingCost" )
+						.matching( 0.40f )
+					.createQuery();
+
+			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
+			String queryString = fullTextQuery.getQueryString();
+			assertJsonEquals( "{'query':{'range':{'shippingCost':{'gte':0.4,'lte':0.4}}}}", queryString );
+		}
+	}
+
+	@Test
+	public void testDSLKeywordDate() throws Exception {
+		try ( Session session = openSession() ) {
+			FullTextSession fullTextSession = Search.getFullTextSession( session );
+			final QueryBuilder queryBuilder = queryBuilder( fullTextSession );
+
+			Calendar date = Calendar.getInstance( TimeZone.getTimeZone( "UTC" ), Locale.ENGLISH );
+			date.set( 1958, 3, 7, 5, 5, 5 );
+			date.set( Calendar.MILLISECOND, 0 );
+
+			Query query = queryBuilder
+					.keyword()
+						.onField( "dateWritten" )
+						.matching( date.getTime() )
+					.createQuery();
+
+			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
+			String queryString = fullTextQuery.getQueryString();
+			assertJsonEquals( "{'query':{'term':{'dateWritten':{'value':'1958-04-07T00:00:00Z'}}}}", queryString );
+		}
+	}
+
+	@Test
+	public void testDSLKeywordCalendar() throws Exception {
+		try ( Session session = openSession() ) {
+			FullTextSession fullTextSession = Search.getFullTextSession( session );
+			final QueryBuilder queryBuilder = queryBuilder( fullTextSession );
+
+			Calendar calendar = Calendar.getInstance( TimeZone.getTimeZone( "UTC" ), Locale.ENGLISH );
+			calendar.set( 1958, 3, 7, 5, 5, 5 );
+			calendar.set( Calendar.MILLISECOND, 0 );
+
+			Query query = queryBuilder
+					.keyword()
+						.onField( "dateSent" )
+						.matching( calendar )
+					.createQuery();
+
+			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
+			String queryString = fullTextQuery.getQueryString();
+			assertJsonEquals( "{'query':{'term':{'dateSent':{'value':'1958-04-07T00:00:00Z'}}}}", queryString );
 		}
 	}
 
@@ -117,7 +243,7 @@ public class ElasticsearchDSLIT extends SearchTestBase {
 
 			FullTextQuery fullTextQuery = fullTextSession.createFullTextQuery( query, Letter.class );
 			String queryString = fullTextQuery.getQueryString();
-			assertJsonEquals( "{'query':{'match_phrase':{'signature':{'query':'Gunnar Morling','analyzer':'default','slop':0,'boost':1.0}}}}", queryString );
+			assertJsonEquals( "{'query':{'match_phrase':{'signature':{'query':'Gunnar Morling','analyzer':'default'}}}}", queryString );
 		}
 	}
 
@@ -147,6 +273,20 @@ public class ElasticsearchDSLIT extends SearchTestBase {
 		@Field
 		private String signature;
 
+		@Field
+		@DateBridge(resolution = Resolution.DAY)
+		private Date dateWritten;
+
+		@Field
+		@DateBridge(resolution = Resolution.DAY)
+		private Calendar dateSent;
+
+		@Field
+		private boolean personal;
+
+		@Field
+		private float shippingCost;
+
 		public Integer getId() {
 			return id;
 		}
@@ -170,5 +310,26 @@ public class ElasticsearchDSLIT extends SearchTestBase {
 		public void setSignature(String signature) {
 			this.signature = signature;
 		}
+
+
+		public Date getDateWritten() {
+			return dateWritten;
+		}
+
+
+		public void setDateWritten(Date dateWritten) {
+			this.dateWritten = dateWritten;
+		}
+
+
+		public Calendar getDateSent() {
+			return dateSent;
+		}
+
+
+		public void setDateSent(Calendar dateSent) {
+			this.dateSent = dateSent;
+		}
+
 	}
 }

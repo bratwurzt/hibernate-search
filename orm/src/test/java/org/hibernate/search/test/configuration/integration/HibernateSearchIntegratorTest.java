@@ -16,10 +16,12 @@ import java.util.HashMap;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
+import org.hibernate.MultiTenancyStrategy;
 import org.hibernate.SessionFactoryObserver;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.registry.classloading.spi.ClassLoaderService;
 import org.hibernate.boot.registry.classloading.spi.ClassLoadingException;
+import org.hibernate.boot.spi.SessionFactoryOptions;
 import org.hibernate.engine.config.internal.ConfigurationServiceImpl;
 import org.hibernate.engine.config.spi.ConfigurationService;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
@@ -31,6 +33,7 @@ import org.hibernate.search.cfg.Environment;
 import org.hibernate.search.event.impl.FullTextIndexEventListener;
 import org.hibernate.search.hcore.impl.HibernateSearchIntegrator;
 import org.hibernate.search.hcore.impl.SearchFactoryReference;
+import org.hibernate.search.query.engine.impl.LuceneQueryTranslator;
 import org.hibernate.service.spi.SessionFactoryServiceRegistry;
 import org.junit.Test;
 import org.unitils.UnitilsJUnit4;
@@ -58,6 +61,9 @@ public class HibernateSearchIntegratorTest extends UnitilsJUnit4 {
 
 	@Mock
 	private ClassLoaderService mockClassLoaderService;
+
+	@Mock
+	private SessionFactoryOptions mockSessionFactoryOptions;
 
 	@Mock
 	private Metadata mockMetadata;
@@ -92,6 +98,14 @@ public class HibernateSearchIntegratorTest extends UnitilsJUnit4 {
 						EasyMock.capture( capturedSessionFactoryObserver ),
 						isA( SessionFactoryObserver.class )
 				)
+		);
+
+		expect( mockSessionFactoryImplementor.getSessionFactoryOptions() ).andReturn(
+				mockSessionFactoryOptions
+		);
+
+		expect( mockSessionFactoryOptions.getMultiTenancyStrategy() ).andReturn(
+				MultiTenancyStrategy.NONE
 		);
 
 		expect( mockSessionFactoryServiceRegistry.getService( EventListenerRegistry.class ) ).andReturn(
@@ -144,6 +158,9 @@ public class HibernateSearchIntegratorTest extends UnitilsJUnit4 {
 		expect( mockClassLoaderService.classForName( "javax.persistence.EmbeddedId" ) )
 			.andReturn( Object.class )
 			.anyTimes();
+
+		expect( mockClassLoaderService.loadJavaServices( LuceneQueryTranslator.class ) )
+				.andReturn( Collections.<LuceneQueryTranslator>emptySet() );
 
 		expect( mockClassLoaderService.loadJavaServices( IndexManagerTypeSpecificBridgeProvider.class ) )
 				.andReturn( Collections.<IndexManagerTypeSpecificBridgeProvider>emptySet() );

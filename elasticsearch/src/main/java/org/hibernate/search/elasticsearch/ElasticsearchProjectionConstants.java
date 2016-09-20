@@ -38,7 +38,8 @@ public interface ElasticsearchProjectionConstants {
 	String OBJECT_CLASS = "_hibernate_class";
 
 	/**
-	 * Represents the distance between an entity and the center of the search radius in case of a spatial query
+	 * Represents the distance (in kilometers) between an entity and the
+	 * center of the search area in case of a spatial query.
 	 */
 	// TODO HSEARCH-2268: Make it start with "__"
 	String SPATIAL_DISTANCE = "_HSearch_SpatialDistance";
@@ -48,5 +49,17 @@ public interface ElasticsearchProjectionConstants {
 	 */
 	String SOURCE = "__HSearch_Source";
 
-	// TODO HSEARCH-2257 add "took" etc.?
+	/**
+	 * The time Elasticsearch took to execute the search, in milliseconds and as an {@code Integer}.
+	 * <p>The time is computed on the server side.
+	 */
+	String TOOK = "__HSearch_Took";
+
+	/**
+	 * Whether the search timed out on the Elasticsearch server or not, as a {@code Boolean}.
+	 * <p>Note that a timed-out search may still return results, they are just incomplete.
+	 * <p>This does not translate a network timeout while reaching out to the Elasticsearch server,
+	 * but a timeout internal to Elasticsearch itself.
+	 */
+	String TIMED_OUT = "__HSearch_TimedOut";
 }

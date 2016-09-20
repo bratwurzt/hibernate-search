@@ -80,6 +80,7 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 	private boolean refreshAfterWrite;
 	private IndexSchemaManagementStrategy indexManagementStrategy;
 	private String indexManagementWaitTimeout;
+	private boolean multitenancyEnabled;
 
 	/**
 	 * Status the index needs to be at least in, otherwise we'll fail starting up.
@@ -120,7 +121,7 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 				}
 			}
 
-			throw new SearchException( "Unexpected index status: " + status + ". Specify one of 'green', 'yellow' or 'red'." );
+			throw LOG.unexpectedIndexStatusString( status );
 		}
 	}
 
@@ -136,6 +137,7 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 		this.indexManagementWaitTimeout = getIndexManagementWaitTimeout( properties );
 		this.actualIndexName = IndexNameNormalizer.getElasticsearchIndexName( this.indexName );
 		this.refreshAfterWrite = getRefreshAfterWrite( properties );
+		this.multitenancyEnabled = context.isMultitenancyEnabled();
 
 		this.similarity = similarity;
 
@@ -166,7 +168,7 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 		);
 
 		if ( timeout < 0 ) {
-			throw new SearchException( "Positive timeout value expected, but it was: " + timeout );
+			throw LOG.negativeTimeoutValue( timeout );
 		}
 
 		return timeout + "ms";
@@ -252,8 +254,8 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 
 		if ( !result.isSucceeded() ) {
 			String status = result.getJsonObject().get( "status" ).getAsString();
-			throw new SearchException( "Index '" + actualIndexName + "' has status '" + status + "', but it is expected to be '"
-					+ requiredIndexStatus.getElasticsearchString() + "'." );
+			throw LOG.unexpectedIndexStatus( actualIndexName, requiredIndexStatus.getElasticsearchString(),
+					status );
 		}
 	}
 
@@ -294,12 +296,12 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 			JsonObject properties = new JsonObject();
 			payload.add( "properties", properties );
 
-			// Add field for tenant id though we don't know at this point if it's actually going to be needed.
-			// TODO HSEARCH-2256 Should we make this configurable?
-			JsonObject field = new JsonObject();
-			field.addProperty( "type", "string" );
-			field.addProperty( "index", NOT_ANALYZED );
-			properties.add( DocumentBuilderIndexedEntity.TENANT_ID_FIELDNAME, field );
+			if ( multitenancyEnabled ) {
+				JsonObject field = new JsonObject();
+				field.addProperty( "type", "string" );
+				field.addProperty( "index", NOT_ANALYZED );
+				properties.add( DocumentBuilderIndexedEntity.TENANT_ID_FIELDNAME, field );
+			}
 
 			// normal document fields
 			for ( DocumentFieldMetadata fieldMetadata : descriptor.getDocumentBuilder().getTypeMetadata().getAllDocumentFieldMetadata() ) {
@@ -327,7 +329,7 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 				jestClient.executeRequest( putMapping );
 			}
 			catch (Exception e) {
-				throw new SearchException( "Could not create mapping for entity type " + entityType.getName(), e );
+				throw LOG.elasticsearchMappingCreationFailed( entityType.getName(), e );
 			}
 		}
 	}
@@ -512,7 +514,7 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 			case NO:
 				return "no";
 			default:
-				throw new IllegalArgumentException( "Unexpected index type: " + index );
+				throw new AssertionFailure( "Unexpected index type: " + index );
 		}
 	}
 
@@ -575,7 +577,7 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 			case STRING:
 				return "string";
 			default:
-				throw new SearchException( "Unexpected field type: " + bridgeDefinedField.getType() );
+				throw LOG.unexpectedFieldType( bridgeDefinedField.getType().name(), bridgeDefinedField.getName() );
 		}
 	}
 
@@ -668,7 +670,7 @@ public class ElasticsearchIndexManager implements IndexManager, RemoteAnalyzerPr
 
 	@Override
 	public ReaderProvider getReaderProvider() {
-		throw new UnsupportedOperationException( "No ReaderProvider / IndexReader with ES" );
+		throw LOG.indexManagerReaderProviderUnsupported();
 	}
 
 	@Override

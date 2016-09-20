@@ -47,7 +47,6 @@ import org.hibernate.search.engine.metadata.impl.PropertyMetadata;
 import org.hibernate.search.engine.service.spi.ServiceReference;
 import org.hibernate.search.engine.spi.DocumentBuilderIndexedEntity;
 import org.hibernate.search.engine.spi.EntityIndexBinding;
-import org.hibernate.search.exception.SearchException;
 import org.hibernate.search.filter.impl.FullTextFilterImpl;
 import org.hibernate.search.indexes.spi.IndexManager;
 import org.hibernate.search.metadata.NumericFieldSettingsDescriptor.NumericEncodingType;
@@ -73,6 +72,7 @@ import org.hibernate.search.util.logging.impl.LoggerFactory;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 
 import io.searchbox.core.DocumentResult;
@@ -88,6 +88,8 @@ import io.searchbox.core.search.sort.Sort.Sorting;
  * @author Gunnar Morling
  */
 public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
+
+	private static final JsonParser JSON_PARSER = new JsonParser();
 
 	private static final Log LOG = LoggerFactory.make( Log.class );
 
@@ -107,7 +109,9 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 					ElasticsearchProjectionConstants.SCORE,
 					ElasticsearchProjectionConstants.SOURCE,
 					ElasticsearchProjectionConstants.SPATIAL_DISTANCE,
-					ElasticsearchProjectionConstants.THIS
+					ElasticsearchProjectionConstants.THIS,
+					ElasticsearchProjectionConstants.TOOK,
+					ElasticsearchProjectionConstants.TIMED_OUT
 			)
 	);
 
@@ -128,7 +132,7 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 
 	@Override
 	public HSQuery luceneQuery(Query query) {
-		throw new UnsupportedOperationException( "Cannot use Lucene query with Elasticsearch" );
+		throw LOG.hsQueryLuceneQueryUnsupported();
 	}
 
 	@Override
@@ -141,7 +145,7 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 
 	@Override
 	public Query getLuceneQuery() {
-		throw new UnsupportedOperationException( "Cannot use Lucene query with Elasticsearch" );
+		throw LOG.hsQueryLuceneQueryUnsupported();
 	}
 
 	@Override
@@ -238,10 +242,11 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 		}
 
 		List<EntityInfo> results = new ArrayList<>( searchResult.getTotal() );
-		JsonArray hits = searchResult.getJsonObject().get( "hits" ).getAsJsonObject().get( "hits" ).getAsJsonArray();
+		JsonObject searchResultJsonObject = searchResult.getJsonObject();
+		JsonArray hits = searchResultJsonObject.get( "hits" ).getAsJsonObject().get( "hits" ).getAsJsonArray();
 
 		for ( JsonElement hit : hits ) {
-			EntityInfo entityInfo = searcher.convertQueryHit( hit.getAsJsonObject() );
+			EntityInfo entityInfo = searcher.convertQueryHit( searchResultJsonObject, hit.getAsJsonObject() );
 			if ( entityInfo != null ) {
 				results.add( entityInfo );
 			}
@@ -504,7 +509,7 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 			}
 		}
 
-		EntityInfo convertQueryHit(JsonObject hit) {
+		EntityInfo convertQueryHit(JsonObject searchResult, JsonObject hit) {
 			String type = hit.get( "_type" ).getAsString();
 			Class<?> clazz = entityTypesByName.get( type );
 
@@ -548,6 +553,12 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 							else {
 								projections[i] = hit.getAsJsonObject().get( "fields" ).getAsJsonObject().get( SPATIAL_DISTANCE_FIELD ).getAsDouble();
 							}
+							break;
+						case ElasticsearchProjectionConstants.TOOK:
+							projections[i] = searchResult.get( "took" ).getAsInt();
+							break;
+						case ElasticsearchProjectionConstants.TIMED_OUT:
+							projections[i] = searchResult.get( "timed_out" ).getAsBoolean();
 							break;
 						case ElasticsearchProjectionConstants.THIS:
 							// Use EntityInfo.ENTITY_PLACEHOLDER as placeholder.
@@ -593,8 +604,9 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 			if ( field == null ) {
 				// We check if it is a field created by a field bridge
 				if ( !isBridgeDefinedField( binding, projectedField ) ) {
-					throw new IllegalArgumentException( "Unknown field " + projectedField + " for entity "
-						+ binding.getDocumentBuilder().getMetadata().getType().getName() );
+					throw LOG.unknownFieldForProjection(
+							binding.getDocumentBuilder().getMetadata().getType().getName(),
+							projectedField );
 				}
 			}
 
@@ -659,9 +671,11 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 						case DOUBLE:
 							tmp.add( new DoubleField( field.getName(), value.getAsDouble(), Store.NO ) );
 							break;
+						case UNKNOWN:
 						default:
-							throw new SearchException( "Unexpected numeric field type: " + binding.getDocumentBuilder().getMetadata().getType() + " "
-								+ field.getName() );
+							throw LOG.unexpectedNumericEncodingType(
+									binding.getDocumentBuilder().getMetadata().getType().getName(),
+									field.getName() );
 					}
 				}
 				else {
@@ -821,19 +835,15 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 					jsonFilter = ToElasticsearch.fromLuceneFilter( (Filter) candidateFilter );
 				}
 				else if ( candidateFilter instanceof ElasticsearchFilter ) {
-					jsonFilter = GsonHolder.PARSER.parse( ( (ElasticsearchFilter) candidateFilter ).getJsonFilter() ).getAsJsonObject();
+					jsonFilter = JSON_PARSER.parse( ( (ElasticsearchFilter) candidateFilter ).getJsonFilter() )
+							.getAsJsonObject();
 				}
 				else {
-					throw new SearchException(
-							"Factory method does not return a Filter class or an ElasticsearchFilter class: "
-									+ def.getImpl().getName() + "." + def.getFactoryMethod().getName() );
+					throw LOG.filterFactoryMethodReturnsUnsupportedType( def.getImpl().getName(), def.getFactoryMethod().getName() );
 				}
 			}
 			catch (IllegalAccessException | InvocationTargetException e) {
-				throw new SearchException(
-						"Unable to access @Factory method: "
-								+ def.getImpl().getName() + "." + def.getFactoryMethod().getName(),
-						e );
+				throw LOG.filterFactoryMethodInaccessible( def.getImpl().getName(), def.getFactoryMethod().getName(), e );
 			}
 		}
 		else {
@@ -841,13 +851,10 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 				jsonFilter = ToElasticsearch.fromLuceneFilter( (Filter) filterOrFactory );
 			}
 			else if ( filterOrFactory instanceof ElasticsearchFilter ) {
-				jsonFilter = GsonHolder.PARSER.parse( ( (ElasticsearchFilter) filterOrFactory ).getJsonFilter() ).getAsJsonObject();
+				jsonFilter = JSON_PARSER.parse( ( (ElasticsearchFilter) filterOrFactory ).getJsonFilter() ).getAsJsonObject();
 			}
 			else {
-				throw new SearchException(
-						"Filter implementation does not implement the Filter interface or does not extend ElasticsearchFilter: "
-								+ def.getImpl().getName() + ". "
-								+ ( def.getFactoryMethod() != null ? def.getFactoryMethod().getName() : "" ) );
+				throw LOG.filterHasUnsupportedType( filterOrFactory == null ? null : filterOrFactory.getClass().getName() );
 			}
 		}
 
@@ -912,16 +919,17 @@ public class ElasticsearchHSQueryImpl extends AbstractHSQuery {
 
 		@Override
 		public TopDocs getTopDocs() {
-			throw new UnsupportedOperationException( "TopDocs not available when using Elasticsearch" );
+			throw LOG.documentExtractorTopDocsUnsupported();
 		}
 
 		private void runSearch() {
 			SearchResult searchResult = searcher.runSearch();
-			JsonArray hits = searchResult.getJsonObject().get( "hits" ).getAsJsonObject().get( "hits" ).getAsJsonArray();
+			JsonObject searchResultJsonObject = searchResult.getJsonObject();
+			JsonArray hits = searchResultJsonObject.get( "hits" ).getAsJsonObject().get( "hits" ).getAsJsonArray();
 			results = new ArrayList<>( searchResult.getTotal() );
 
 			for ( JsonElement hit : hits ) {
-				EntityInfo converted = searcher.convertQueryHit( hit.getAsJsonObject() );
+				EntityInfo converted = searcher.convertQueryHit( searchResultJsonObject, hit.getAsJsonObject() );
 				if ( converted != null ) {
 					results.add( converted );
 				}
